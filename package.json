@@ -1,0 +1,45 @@
+{
+  "name": "business-regulation-compliance",
+  "version": "1.0.0",
+  "description": "A comprehensive website to help US business owners determine applicable regulations and compliance requirements",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "server:dev": "nodemon server/index.js",
+    "client:dev": "cd client && npm start",
+    "build": "cd client && npm run build",
+    "start": "node server/index.js",
+    "db:setup": "node server/database/setup.js",
+    "db:seed": "node server/database/seed.js",
+    "db:seed:regulations": "node server/database/regulations-seeder.js",
+    "db:seed:regulations:batch2": "node server/database/regulations-seeder-batch2.js",
+    "db:migrate:business-factors": "node server/database/migrate-business-factors.js",
+    "test:business-mapping": "node test-business-mapping.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3",
+    "redis": "^4.6.10",
+    "graphql": "^15.8.0",
+    "apollo-server-express": "^3.12.1",
+    "joi": "^17.11.0",
+    "axios": "^1.6.0",
+    "compression": "^1.7.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "business",
+    "regulation",
+    "compliance",
+    "california",
+    "kern-county"
+  ],
+  "author": "Business Regulation Team",
+  "license": "MIT"
+}
