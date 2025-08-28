@@ -14,6 +14,7 @@
     "db:seed:regulations": "node server/database/regulations-seeder.js",
     "db:seed:regulations:batch2": "node server/database/regulations-seeder-batch2.js",
     "db:migrate:business-factors": "node server/database/migrate-business-factors.js",
+    "db:cleanup": "node server/database/cleanup-test-data.js",
     "test:business-mapping": "node test-business-mapping.js"
   },
   "dependencies": {
