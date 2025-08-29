@@ -23,7 +23,8 @@
     "db:cleanup": "node server/database/cleanup-test-data.js",
     "test:business-mapping": "node test-business-mapping.js",
     "render:setup": "npm run db:setup && npm run db:seed:regulations",
-    "render:deploy": "node render-setup.js"
+    "render:deploy": "node render-setup.js",
+    "db:full": "npm run db:setup && npm run db:seed:regulations"
   },
   "dependencies": {
     "express": "^4.18.2",

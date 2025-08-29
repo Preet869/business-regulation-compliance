@@ -39,6 +39,14 @@ async function buildForRender() {
     execSync('node server/database/setup.js', { stdio: 'inherit' });
     console.log('✅ Database setup completed');
     
+    console.log('🌱 Seeding regulations data...');
+    try {
+      execSync('node server/database/regulations-seeder.js', { stdio: 'inherit' });
+      console.log('✅ Regulations data seeded successfully');
+    } catch (error) {
+      console.log('⚠️ Regulation seeding failed (may already exist):', error.message);
+    }
+    
     console.log('🎉 Render build process completed successfully!');
     
   } catch (error) {

@@ -188,4 +188,47 @@ router.get('/status', async (req, res) => {
   }
 });
 
+// Debug endpoint to check database status
+router.get('/debug', async (req, res) => {
+  try {
+    // Check if tables exist
+    const tablesResult = await query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `);
+    
+    // Check regulations count
+    let regulationsCount = 0;
+    try {
+      const regCountResult = await query('SELECT COUNT(*) as count FROM regulations');
+      regulationsCount = regCountResult.rows[0].count;
+    } catch (e) {
+      regulationsCount = 'Error: ' + e.message;
+    }
+    
+    // Check businesses count
+    let businessesCount = 0;
+    try {
+      const busCountResult = await query('SELECT COUNT(*) as count FROM businesses');
+      businessesCount = busCountResult.rows[0].count;
+    } catch (e) {
+      businessesCount = 'Error: ' + e.message;
+    }
+    
+    res.json({
+      status: 'Database Debug Info',
+      timestamp: new Date().toISOString(),
+      tables: tablesResult.rows.map(row => row.table_name),
+      regulationsCount,
+      businessesCount,
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    console.error('Debug endpoint error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
