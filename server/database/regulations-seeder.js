@@ -369,6 +369,26 @@ async function seedRegulations() {
   }
 }
 
+// Function to run both seeders for complete data
+async function seedAllRegulations() {
+  try {
+    console.log('🌱 Starting complete regulation seeding (both batches)...');
+    
+    // Run first batch
+    await seedRegulations();
+    
+    // Run second batch
+    const { seedRegulationsBatch2 } = require('./regulations-seeder-batch2');
+    await seedRegulationsBatch2();
+    
+    console.log('🎉 Complete seeding finished!');
+    
+  } catch (error) {
+    console.error('❌ Error in complete seeding:', error);
+    throw error;
+  }
+}
+
 // Run seeder if this file is executed directly
 if (require.main === module) {
   seedRegulations()
@@ -382,4 +402,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { seedRegulations };
+module.exports = { seedRegulations, seedAllRegulations };

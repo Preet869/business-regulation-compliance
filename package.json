@@ -19,6 +19,7 @@
     "db:seed": "node server/database/seed.js",
     "db:seed:regulations": "node server/database/regulations-seeder.js",
     "db:seed:regulations:batch2": "node server/database/regulations-seeder-batch2.js",
+    "db:seed:regulations:all": "node -e \"require('./server/database/regulations-seeder').seedAllRegulations()\"",
     "db:migrate:business-factors": "node server/database/migrate-business-factors.js",
     "db:cleanup": "node server/database/cleanup-test-data.js",
     "db:force-reseed": "node server/database/force-reseed.js",

@@ -22,10 +22,18 @@ async function forceReseed() {
     
     console.log('✅ Sequences reset');
     
-    // Now run the seeder
-    console.log('🌱 Running regulation seeder...');
+    // Now run the seeders
+    console.log('🌱 Running regulation seeders...');
+    
+    // Run first batch
+    console.log('📦 Seeding first batch of regulations...');
     const { seedRegulations } = require('./regulations-seeder');
     await seedRegulations();
+    
+    // Run second batch
+    console.log('📦 Seeding second batch of regulations...');
+    const { seedRegulationsBatch2 } = require('./regulations-seeder-batch2');
+    await seedRegulationsBatch2();
     
     console.log('🎉 Force reseed completed successfully!');
     

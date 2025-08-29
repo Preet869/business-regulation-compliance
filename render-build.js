@@ -55,6 +55,15 @@ async function buildForRender() {
       }
     }
     
+    // Force reseed to ensure we have all 48 regulations
+    console.log('🔄 Force reseeding to ensure complete data...');
+    try {
+      execSync('npm run db:force-reseed', { stdio: 'inherit' });
+      console.log('✅ Force reseed completed successfully');
+    } catch (forceReseedError) {
+      console.log('⚠️ Force reseed failed:', forceReseedError.message);
+    }
+    
     console.log('🎉 Render build process completed successfully!');
     
   } catch (error) {
