@@ -673,6 +673,12 @@ async function seedRegulationsBatch2() {
     console.log('🌱 Starting second batch of regulation seeding...');
     
     for (const regulation of regulationsBatch2) {
+      // Handle compliance deadline - convert text to date or null
+      let complianceDeadline = null;
+      if (regulation.complianceDeadline && !isNaN(Date.parse(regulation.complianceDeadline))) {
+        complianceDeadline = regulation.complianceDeadline;
+      }
+      
       // Insert regulation
       const regulationResult = await query(`
         INSERT INTO regulations (title, description, category, jurisdiction, authority, effective_date, compliance_deadline)
@@ -685,7 +691,7 @@ async function seedRegulationsBatch2() {
         regulation.jurisdiction,
         regulation.authority,
         regulation.effectiveDate,
-        regulation.complianceDeadline
+        complianceDeadline
       ]);
       
       const regulationId = regulationResult.rows[0].id;
