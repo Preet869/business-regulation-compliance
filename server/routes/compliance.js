@@ -199,9 +199,25 @@ router.post('/save', async (req, res) => {
       timestamp 
     } = req.body;
 
+    console.log('Saving compliance result:', {
+      businessId,
+      complianceScore,
+      riskLevel,
+      applicableRegulationsCount: applicableRegulations?.length || 0,
+      timestamp
+    });
+
     // Validate required fields
     if (!businessId || complianceScore === undefined || !riskLevel) {
+      console.log('Missing required fields:', { businessId, complianceScore, riskLevel });
       return res.status(400).json({ error: 'Missing required fields: businessId, complianceScore, riskLevel' });
+    }
+
+    // Verify business exists
+    const businessCheck = await query('SELECT id FROM businesses WHERE id = $1', [businessId]);
+    if (businessCheck.rows.length === 0) {
+      console.log('Business not found:', businessId);
+      return res.status(404).json({ error: 'Business not found' });
     }
 
     // Insert compliance result
@@ -211,24 +227,33 @@ router.post('/save', async (req, res) => {
       RETURNING *
     `, [businessId, complianceScore, riskLevel, timestamp || new Date().toISOString()]);
 
+    console.log('Compliance result saved:', result.rows[0]);
+
     // Save detailed regulation information to business_regulations table
     if (applicableRegulations && applicableRegulations.length > 0) {
+      console.log('Saving', applicableRegulations.length, 'regulations to business_regulations');
+      
       for (const regulation of applicableRegulations) {
-        await query(`
-          INSERT INTO business_regulations (business_id, regulation_id, is_applicable, compliance_status, created_at)
-          VALUES ($1, $2, $3, $4, $5)
-          ON CONFLICT (business_id, regulation_id) 
-          DO UPDATE SET 
-            is_applicable = EXCLUDED.is_applicable,
-            compliance_status = EXCLUDED.compliance_status,
-            updated_at = CURRENT_TIMESTAMP
-        `, [
-          businessId, 
-          regulation.id, 
-          true, 
-          'pending', 
-          timestamp || new Date().toISOString()
-        ]);
+        try {
+          await query(`
+            INSERT INTO business_regulations (business_id, regulation_id, is_applicable, compliance_status, created_at)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (business_id, regulation_id) 
+            DO UPDATE SET 
+              is_applicable = EXCLUDED.is_applicable,
+              compliance_status = EXCLUDED.compliance_status,
+              updated_at = CURRENT_TIMESTAMP
+          `, [
+            businessId, 
+            regulation.id, 
+            true, 
+            'pending', 
+            timestamp || new Date().toISOString()
+          ]);
+          console.log('Saved regulation:', regulation.id, regulation.title);
+        } catch (regError) {
+          console.error('Error saving regulation:', regulation.id, regError.message);
+        }
       }
     }
 

@@ -152,17 +152,51 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await query(`
+    // Get business details
+    const businessResult = await query(`
       SELECT * FROM businesses WHERE id = $1
     `, [id]);
     
-    if (result.rows.length === 0) {
+    if (businessResult.rows.length === 0) {
       return res.status(404).json({ error: 'Business not found' });
     }
     
-    const business = result.rows[0];
+    const business = businessResult.rows[0];
     
-    res.json({
+    // Get compliance history
+    const complianceResult = await query(`
+      SELECT cr.*, 
+             array_agg(DISTINCT br.regulation_id) as regulation_ids,
+             array_agg(DISTINCT br.compliance_status) as compliance_statuses
+      FROM compliance_results cr
+      LEFT JOIN business_regulations br ON cr.business_id = br.business_id
+      WHERE cr.business_id = $1
+      GROUP BY cr.id, cr.business_id, cr.compliance_score, cr.risk_level, cr.created_at
+      ORDER BY cr.created_at DESC
+    `, [id]);
+    
+    // Get detailed regulation information
+    const regulationsResult = await query(`
+      SELECT DISTINCT r.*, 
+             array_agg(DISTINCT p.type || ': $' || p.amount || ' - ' || p.description) as penalties,
+             array_agg(DISTINCT req.description || ' (' || req.frequency || ')') as requirements,
+             array_agg(DISTINCT e.exemption_text) as exemptions,
+             array_agg(DISTINCT a.applies_to) as applies_to,
+             br.compliance_status,
+             br.is_applicable
+      FROM business_regulations br
+      JOIN regulations r ON br.regulation_id = r.id
+      LEFT JOIN penalties p ON r.id = p.regulation_id
+      LEFT JOIN requirements req ON r.id = req.regulation_id
+      LEFT JOIN regulation_exemptions e ON r.id = e.regulation_id
+      LEFT JOIN regulation_applicability a ON r.id = a.regulation_id
+      WHERE br.business_id = $1
+      GROUP BY r.id, r.title, r.description, r.category, r.jurisdiction, r.authority, r.effective_date, r.compliance_deadline, br.compliance_status, br.is_applicable
+      ORDER BY r.category, r.title
+    `, [id]);
+    
+    // Format the response
+    const businessData = {
       id: business.id,
       name: business.name,
       industry: business.industry,
@@ -177,8 +211,49 @@ router.get('/:id', async (req, res) => {
       annualRevenue: business.annual_revenue,
       businessType: business.business_type,
       createdAt: business.created_at,
-      updatedAt: business.updated_at
-    });
+      updatedAt: business.updated_at,
+      complianceHistory: complianceResult.rows.map(cr => ({
+        id: cr.id,
+        complianceScore: cr.compliance_score,
+        riskLevel: cr.risk_level,
+        createdAt: cr.created_at,
+        regulationCount: cr.regulation_ids ? cr.regulation_ids.filter(id => id !== null).length : 0
+      })),
+      applicableRegulations: regulationsResult.rows.map(r => ({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        category: r.category,
+        jurisdiction: r.jurisdiction,
+        authority: r.authority,
+        effectiveDate: r.effective_date,
+        complianceDeadline: r.compliance_deadline,
+        complianceStatus: r.compliance_status,
+        isApplicable: r.is_applicable,
+        penalties: r.penalties.filter(p => p !== null).map(p => {
+          const [type, rest] = p.split(':');
+          const [amount, description] = rest.split(' - ');
+          return {
+            type: type.trim(),
+            amount: parseFloat(amount.replace('$', '')),
+            description: description.trim()
+          };
+        }),
+        requirements: r.requirements.filter(req => req !== null).map(req => {
+          const [description, frequency] = req.split(' (');
+          return {
+            description: description.trim(),
+            frequency: frequency ? frequency.replace(')', '') : 'As needed',
+            documentation: 'Required documentation varies by regulation',
+            deadline: 'Varies by requirement'
+          };
+        }),
+        exemptions: r.exemptions.filter(e => e !== null),
+        appliesTo: r.applies_to.filter(a => a !== null)
+      }))
+    };
+    
+    res.json(businessData);
 
   } catch (error) {
     console.error('Error fetching business:', error);
@@ -314,6 +389,92 @@ router.get('/stats/overview', async (req, res) => {
   } catch (error) {
     console.error('Error fetching business statistics:', error);
     res.status(500).json({ error: 'Failed to fetch business statistics' });
+  }
+});
+
+// Get compliance history for a business
+router.get('/:id/compliance', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get compliance results
+    const complianceResult = await query(`
+      SELECT cr.*, 
+             array_agg(DISTINCT br.regulation_id) as regulation_ids,
+             array_agg(DISTINCT br.compliance_status) as compliance_statuses
+      FROM compliance_results cr
+      LEFT JOIN business_regulations br ON cr.business_id = br.business_id
+      WHERE cr.business_id = $1
+      GROUP BY cr.id, cr.business_id, cr.compliance_score, cr.risk_level, cr.created_at
+      ORDER BY cr.created_at DESC
+    `, [id]);
+    
+    // Get detailed regulation information
+    const regulationsResult = await query(`
+      SELECT DISTINCT r.*, 
+             array_agg(DISTINCT p.type || ': $' || p.amount || ' - ' || p.description) as penalties,
+             array_agg(DISTINCT req.description || ' (' || req.frequency || ')') as requirements,
+             array_agg(DISTINCT e.exemption_text) as exemptions,
+             array_agg(DISTINCT a.applies_to) as applies_to,
+             br.compliance_status,
+             br.is_applicable
+      FROM business_regulations br
+      JOIN regulations r ON br.regulation_id = r.id
+      LEFT JOIN penalties p ON r.id = p.regulation_id
+      LEFT JOIN requirements req ON r.id = req.regulation_id
+      LEFT JOIN regulation_exemptions e ON r.id = e.regulation_id
+      LEFT JOIN regulation_applicability a ON r.id = a.regulation_id
+      WHERE br.business_id = $1
+      GROUP BY r.id, r.title, r.description, r.category, r.jurisdiction, r.authority, r.effective_date, r.compliance_deadline, br.compliance_status, br.is_applicable
+      ORDER BY r.category, r.title
+    `, [id]);
+    
+    res.json({
+      businessId: id,
+      complianceHistory: complianceResult.rows.map(cr => ({
+        id: cr.id,
+        complianceScore: cr.compliance_score,
+        riskLevel: cr.risk_level,
+        createdAt: cr.created_at,
+        regulationCount: cr.regulation_ids ? cr.regulation_ids.filter(id => id !== null).length : 0
+      })),
+      applicableRegulations: regulationsResult.rows.map(r => ({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        category: r.category,
+        jurisdiction: r.jurisdiction,
+        authority: r.authority,
+        effectiveDate: r.effective_date,
+        complianceDeadline: r.compliance_deadline,
+        complianceStatus: r.compliance_status,
+        isApplicable: r.is_applicable,
+        penalties: r.penalties.filter(p => p !== null).map(p => {
+          const [type, rest] = p.split(':');
+          const [amount, description] = rest.split(' - ');
+          return {
+            type: type.trim(),
+            amount: parseFloat(amount.replace('$', '')),
+            description: description.trim()
+          };
+        }),
+        requirements: r.requirements.filter(req => req !== null).map(req => {
+          const [description, frequency] = req.split(' (');
+          return {
+            description: description.trim(),
+            frequency: frequency ? frequency.replace(')', '') : 'As needed',
+            documentation: 'Required documentation varies by regulation',
+            deadline: 'Varies by requirement'
+          };
+        }),
+        exemptions: r.exemptions.filter(e => e !== null),
+        appliesTo: r.applies_to.filter(a => a !== null)
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error fetching business compliance:', error);
+    res.status(500).json({ error: 'Failed to fetch business compliance' });
   }
 });
 
