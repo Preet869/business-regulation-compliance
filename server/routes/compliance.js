@@ -304,7 +304,7 @@ async function determineApplicableRegulations(businessData) {
     queryParams.push(businessData.city);
     queryText += ` AND (r.jurisdiction = $${++paramCount} OR r.jurisdiction = 'Kern County' OR r.jurisdiction = 'California' OR r.jurisdiction = 'Federal')`;
 
-        // Add industry-specific regulations
+    // Add industry-specific regulations
     if (businessData.industry) {
       // Map industry to actual database categories that exist
       const industryCategoryMap = {
@@ -312,10 +312,10 @@ async function determineApplicableRegulations(businessData) {
         'Automotive': ['Transportation', 'Environmental', 'Workplace Safety'],
         'Construction': ['Workplace Safety', 'Environmental', 'Business Licensing', 'Land Use'],
         'Food Service': ['Health & Safety', 'Business Licensing', 'Local Ordinances'],
-        'Healthcare': ['Health & Safety', 'Privacy & Security', 'Professional Licensing'],
+        'Healthcare': ['Health & Safety', 'Privacy & Security', 'Professional Licensing', 'Workplace Safety', 'Labor & Employment', 'Civil Rights'],
         'Manufacturing': ['Workplace Safety', 'Environmental', 'Business Licensing'],
         'Retail': ['Business Licensing', 'Local Ordinances', 'Taxation'],
-        'Technology': ['Business Licensing', 'Privacy & Security', 'Labor & Employment', 'Workplace Safety'], // Added more categories
+        'Technology': ['Business Licensing', 'Privacy & Security', 'Labor & Employment', 'Workplace Safety'],
         'Transportation': ['Transportation', 'Environmental', 'Workplace Safety'],
         'Other': ['Business Licensing', 'Local Ordinances']
       };
@@ -333,17 +333,34 @@ async function determineApplicableRegulations(businessData) {
       const categoryPlaceholders = relevantCategories.map((_, index) => `$${paramCount - relevantCategories.length + index + 1}`).join(', ');
       queryText += ` AND (r.category IN (${categoryPlaceholders}) OR r.category = 'Business Licensing')`;
       
-      // Filter out healthcare-specific regulations for non-healthcare industries
-      if (businessData.industry !== 'Healthcare') {
+      // For healthcare, include all relevant regulations without restrictions
+      if (businessData.industry === 'Healthcare') {
+        // Don't filter out any healthcare-specific regulations
+        console.log('Healthcare business - including all relevant regulations');
+      } else {
+        // Filter out healthcare-specific regulations for non-healthcare industries
         queryText += ` AND (r.title NOT LIKE '%HIPAA%' AND r.title NOT LIKE '%Healthcare%' AND r.title NOT LIKE '%Medical%')`;
       }
     }
     
-    // Add business size filters
+    // Add business size filters - but be less restrictive
     if (businessData.size === 'Small') {
-      queryText += ` AND (r.category != 'Large Business Only')`;
+      // Small businesses still get most regulations, just fewer penalties
+      console.log('Small business - including most regulations');
     } else if (businessData.size === 'Large') {
-              queryText += ` AND (r.category != 'Small Business Only')`;
+      // Large businesses get all regulations
+      console.log('Large business - including all regulations');
+    }
+    
+    // Add employee count considerations
+    if (businessData.employeeCount >= 50) {
+      // FMLA applies to businesses with 50+ employees
+      console.log('50+ employees - FMLA regulations apply');
+    }
+    
+    if (businessData.employeeCount >= 5) {
+      // Sexual harassment training applies to businesses with 5+ employees
+      console.log('5+ employees - Sexual harassment training applies');
     }
 
     queryText += `
@@ -361,8 +378,64 @@ async function determineApplicableRegulations(businessData) {
       console.log('Sample regulation:', result.rows[0]);
     }
     
+    // Post-process to include additional regulations based on business characteristics
+    let finalRegulations = [...result.rows];
+    
+    // Add regulations based on employee count
+    if (businessData.employeeCount >= 50) {
+      // FMLA applies to businesses with 50+ employees
+      const fmlaRegulation = await query(`
+        SELECT DISTINCT r.*, 
+               array_agg(DISTINCT p.type || ': $' || p.amount || ' - ' || p.description) as penalties,
+               array_agg(DISTINCT req.description || ' (' || req.frequency || ')') as requirements,
+               array_agg(DISTINCT e.exemption_text) as exemptions,
+               array_agg(DISTINCT a.applies_to) as applies_to
+        FROM regulations r
+        LEFT JOIN penalties p ON r.id = p.regulation_id
+        LEFT JOIN requirements req ON r.id = req.regulation_id
+        LEFT JOIN regulation_exemptions e ON r.id = e.regulation_id
+        LEFT JOIN regulation_applicability a ON r.id = a.regulation_id
+        WHERE r.title LIKE '%FMLA%' OR r.title LIKE '%Family and Medical Leave%'
+        GROUP BY r.id, r.title, r.description, r.category, r.jurisdiction, r.authority, r.effective_date, r.compliance_deadline
+      `);
+      
+      if (fmlaRegulation.rows.length > 0 && !finalRegulations.find(r => r.id === fmlaRegulation.rows[0].id)) {
+        finalRegulations.push(fmlaRegulation.rows[0]);
+        console.log('Added FMLA regulation for 50+ employees');
+      }
+    }
+    
+    // Add regulations based on business size and industry
+    if (businessData.size === 'Medium' || businessData.size === 'Large') {
+      // Medium/Large businesses get more comprehensive regulations
+      const additionalRegulations = await query(`
+        SELECT DISTINCT r.*, 
+               array_agg(DISTINCT p.type || ': $' || p.amount || ' - ' || p.description) as penalties,
+               array_agg(DISTINCT req.description || ' (' || req.frequency || ')') as requirements,
+               array_agg(DISTINCT e.exemption_text) as exemptions,
+               array_agg(DISTINCT a.applies_to) as applies_to
+        FROM regulations r
+        LEFT JOIN penalties p ON r.id = p.regulation_id
+        LEFT JOIN requirements req ON r.id = req.regulation_id
+        LEFT JOIN regulation_exemptions e ON r.id = e.regulation_id
+        LEFT JOIN regulation_applicability a ON r.id = a.regulation_id
+        WHERE (r.category IN ('Labor & Employment', 'Workplace Safety', 'Civil Rights'))
+        AND r.jurisdiction IN ('Federal', 'California')
+        GROUP BY r.id, r.title, r.description, r.category, r.jurisdiction, r.authority, r.effective_date, r.compliance_deadline
+      `);
+      
+      additionalRegulations.rows.forEach(reg => {
+        if (!finalRegulations.find(r => r.id === reg.id)) {
+          finalRegulations.push(reg);
+          console.log('Added additional regulation:', reg.title);
+        }
+      });
+    }
+    
+    console.log('Final regulations count after post-processing:', finalRegulations.length);
+    
     // Process and format the results
-    return result.rows.map(row => ({
+    return finalRegulations.map(row => ({
       id: row.id,
       title: row.title,
       description: row.description,
