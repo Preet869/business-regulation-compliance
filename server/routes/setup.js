@@ -3,18 +3,36 @@ const router = express.Router();
 const { query } = require('../database/connection');
 const setupDatabase = require('../database/setup');
 
+// Import seeder functions
+const seedDatabase = require('../database/seed');
+const seedRegulations = require('../database/regulations-seeder');
+const seedRegulationsBatch2 = require('../database/regulations-seeder-batch2');
+
 // Database setup endpoint - call this once to initialize your database
 router.post('/init', async (req, res) => {
   try {
     console.log('🚀 Initializing database...');
     
-    // Run the setup script
+    // Step 1: Run the setup script (creates tables)
+    console.log('📋 Creating database tables...');
     await setupDatabase();
     
-    console.log('✅ Database setup completed successfully!');
+    // Step 2: Seed the database with initial data
+    console.log('🌱 Seeding database with initial data...');
+    await seedDatabase();
+    
+    // Step 3: Seed regulations data
+    console.log('📜 Seeding regulations data...');
+    await seedRegulations();
+    
+    // Step 4: Seed additional regulations data
+    console.log('📜 Seeding additional regulations data...');
+    await seedRegulationsBatch2();
+    
+    console.log('✅ Database setup and seeding completed successfully!');
     res.json({ 
       success: true, 
-      message: 'Database initialized successfully',
+      message: 'Database initialized and populated successfully',
       timestamp: new Date().toISOString()
     });
     
