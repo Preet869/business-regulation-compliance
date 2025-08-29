@@ -11,6 +11,7 @@ const { connectRedis } = require('./database/redis');
 const businessRoutes = require('./routes/business');
 const complianceRoutes = require('./routes/compliance');
 const regulationRoutes = require('./routes/regulations');
+const setupRoutes = require('./routes/setup');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -154,6 +155,7 @@ const server = new ApolloServer({
 app.use('/api/business', businessRoutes);
 app.use('/api/compliance', complianceRoutes);
 app.use('/api/regulations', regulationRoutes);
+app.use('/api/setup', setupRoutes);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
