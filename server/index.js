@@ -5,6 +5,7 @@ const compression = require('compression');
 const { ApolloServer } = require('apollo-server-express');
 const path = require('path');
 require('dotenv').config();
+const fs = require('fs'); // Added for file system operations
 
 const { connectDB } = require('./database/connection');
 const { connectRedis } = require('./database/redis');
@@ -159,16 +160,56 @@ app.use('/api/setup', setupRoutes);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/build')));
+  const clientBuildPath = path.join(__dirname, '../client/build');
   
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-  });
+  // Check if client build exists
+  if (fs.existsSync(clientBuildPath)) {
+    app.use(express.static(clientBuildPath));
+    
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(clientBuildPath, 'index.html'));
+    });
+    console.log('✅ Serving static files from client build');
+  } else {
+    console.log('⚠️ Client build not found, serving API only');
+    
+    // Serve API routes only
+    app.get('/', (req, res) => {
+      res.json({ 
+        message: 'Business Regulation Compliance API',
+        status: 'running',
+        endpoints: {
+          graphql: '/graphql',
+          api: '/api',
+          health: '/health'
+        }
+      });
+    });
+  }
 }
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+app.get('/health', async (req, res) => {
+  try {
+    // Check database connection
+    const client = await pool.connect();
+    client.release();
+    
+    res.json({ 
+      status: 'OK', 
+      timestamp: new Date().toISOString(),
+      database: 'connected',
+      environment: process.env.NODE_ENV || 'development',
+      port: PORT
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'ERROR', 
+      timestamp: new Date().toISOString(),
+      database: 'disconnected',
+      error: error.message
+    });
+  }
 });
 
 // Error handling middleware
