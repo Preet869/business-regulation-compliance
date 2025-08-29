@@ -84,4 +84,57 @@ router.get('/status', async (req, res) => {
   }
 });
 
+// Debug endpoint to test database connection
+router.get('/debug', async (req, res) => {
+  try {
+    console.log('🔍 Testing database connection...');
+    
+    // Test basic connection
+    const client = await query('SELECT 1 as test');
+    console.log('✅ Basic query successful:', client.rows[0]);
+    
+    // Test if we can create a simple table
+    console.log('🔍 Testing table creation...');
+    await query(`
+      CREATE TABLE IF NOT EXISTS test_table (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100)
+      )
+    `);
+    console.log('✅ Test table created successfully');
+    
+    // Check if test table exists
+    const testTableResult = await query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_name = 'test_table'
+    `);
+    console.log('✅ Test table verification:', testTableResult.rows);
+    
+    // Clean up test table
+    await query('DROP TABLE IF EXISTS test_table');
+    console.log('✅ Test table cleaned up');
+    
+    res.json({
+      success: true,
+      message: 'Database connection and permissions test successful',
+      testResults: {
+        basicQuery: '✅ Passed',
+        tableCreation: '✅ Passed',
+        tableVerification: '✅ Passed',
+        cleanup: '✅ Passed'
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Database debug test failed:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 module.exports = router;
