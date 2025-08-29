@@ -41,10 +41,18 @@ async function buildForRender() {
     
     console.log('🌱 Seeding regulations data...');
     try {
-      execSync('node server/database/regulations-seeder.js', { stdio: 'inherit' });
-      console.log('✅ Regulations data seeded successfully');
+      // Check if data already exists
+      execSync('node server/database/check-data.js', { stdio: 'pipe' });
+      console.log('✅ Database already has data, skipping seeding');
     } catch (error) {
-      console.log('⚠️ Regulation seeding failed (may already exist):', error.message);
+      // Exit code 1 means no data, so seed
+      console.log('📝 Database is empty, seeding regulations...');
+      try {
+        execSync('node server/database/regulations-seeder.js', { stdio: 'inherit' });
+        console.log('✅ Regulations data seeded successfully');
+      } catch (seedError) {
+        console.log('⚠️ Regulation seeding failed:', seedError.message);
+      }
     }
     
     console.log('🎉 Render build process completed successfully!');

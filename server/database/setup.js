@@ -142,23 +142,38 @@ const setupDatabase = async () => {
     `);
 
     // Create triggers for updated_at
-    await query(`
-      CREATE TRIGGER update_businesses_updated_at 
-      BEFORE UPDATE ON businesses 
-      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-    `);
+    try {
+      await query(`
+        DROP TRIGGER IF EXISTS update_businesses_updated_at ON businesses;
+        CREATE TRIGGER update_businesses_updated_at 
+        BEFORE UPDATE ON businesses 
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+      `);
+    } catch (error) {
+      console.log('⚠️ Businesses trigger creation skipped (may already exist)');
+    }
 
-    await query(`
-      CREATE TRIGGER update_regulations_updated_at 
-      BEFORE UPDATE ON regulations 
-      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-    `);
+    try {
+      await query(`
+        DROP TRIGGER IF EXISTS update_regulations_updated_at ON regulations;
+        CREATE TRIGGER update_regulations_updated_at 
+        BEFORE UPDATE ON regulations 
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+      `);
+    } catch (error) {
+      console.log('⚠️ Regulations trigger creation skipped (may already exist)');
+    }
 
-    await query(`
-      CREATE TRIGGER update_business_regulations_updated_at 
-      BEFORE UPDATE ON business_regulations 
-      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-    `);
+    try {
+      await query(`
+        DROP TRIGGER IF EXISTS update_business_regulations_updated_at ON business_regulations;
+        CREATE TRIGGER update_business_regulations_updated_at 
+        BEFORE UPDATE ON business_regulations 
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+      `);
+    } catch (error) {
+      console.log('⚠️ Business regulations trigger creation skipped (may already exist)');
+    }
 
     console.log('✅ Triggers and functions created successfully!');
 
