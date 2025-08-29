@@ -4,6 +4,12 @@ let client = null;
 
 const connectRedis = async () => {
   try {
+    // Skip Redis if explicitly disabled or no REDIS_URL provided
+    if (process.env.REDIS_DISABLED === 'true' || !process.env.REDIS_URL) {
+      console.log('⚠️ Redis disabled or no REDIS_URL provided - skipping Redis connection');
+      return;
+    }
+
     client = redis.createClient({
       url: process.env.REDIS_URL || 'redis://localhost:6379',
       socket: {
@@ -14,6 +20,7 @@ const connectRedis = async () => {
 
     client.on('error', (err) => {
       console.error('❌ Redis Client Error:', err);
+      // Don't crash the server on Redis errors
     });
 
     client.on('connect', () => {
@@ -27,7 +34,8 @@ const connectRedis = async () => {
     await client.connect();
   } catch (error) {
     console.error('❌ Error connecting to Redis:', error);
-    throw error;
+    // Don't crash the server on Redis connection failure
+    console.log('⚠️ Continuing without Redis - caching will be disabled');
   }
 };
 
@@ -40,6 +48,7 @@ const getRedisClient = () => {
 
 const setCache = async (key, value, ttl = 3600) => {
   try {
+    if (!client) return; // Skip if Redis not available
     const client = getRedisClient();
     await client.setEx(key, ttl, JSON.stringify(value));
   } catch (error) {
@@ -49,6 +58,7 @@ const setCache = async (key, value, ttl = 3600) => {
 
 const getCache = async (key) => {
   try {
+    if (!client) return null; // Skip if Redis not available
     const client = getRedisClient();
     const value = await client.get(key);
     return value ? JSON.parse(value) : null;
@@ -60,6 +70,7 @@ const getCache = async (key) => {
 
 const deleteCache = async (key) => {
   try {
+    if (!client) return; // Skip if Redis not available
     const client = getRedisClient();
     await client.del(key);
   } catch (error) {
@@ -69,6 +80,7 @@ const deleteCache = async (key) => {
 
 const clearCache = async () => {
   try {
+    if (!client) return; // Skip if Redis not available
     const client = getRedisClient();
     await client.flushAll();
     console.log('✅ Cache cleared');
