@@ -280,63 +280,91 @@ async function seedRegulations() {
   try {
     console.log('🌱 Starting comprehensive regulation seeding...');
     
-    for (const regulation of regulations) {
-      // Insert regulation
-      const regulationResult = await query(`
-        INSERT INTO regulations (title, description, category, jurisdiction, authority, effective_date, compliance_deadline)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id
-      `, [
-        regulation.title,
-        regulation.description,
-        regulation.category,
-        regulation.jurisdiction,
-        regulation.authority,
-        regulation.effectiveDate,
-        regulation.complianceDeadline
-      ]);
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (let i = 0; i < regulations.length; i++) {
+      const regulation = regulations[i];
       
-      const regulationId = regulationResult.rows[0].id;
-      
-      // Insert penalties
-      for (const penalty of regulation.penalties) {
-        await query(`
-          INSERT INTO penalties (regulation_id, type, amount, description)
-          VALUES ($1, $2, $3, $4)
-        `, [regulationId, penalty.type, penalty.amount, penalty.description]);
+      try {
+        // Check if regulation already exists
+        const existingResult = await query(`
+          SELECT id FROM regulations WHERE title = $1 AND jurisdiction = $2
+        `, [regulation.title, regulation.jurisdiction]);
+        
+        if (existingResult.rows.length > 0) {
+          console.log(`⏭️ Regulation already exists: ${regulation.title}`);
+          successCount++;
+          continue;
+        }
+        
+        // Insert regulation
+        const regulationResult = await query(`
+          INSERT INTO regulations (title, description, category, jurisdiction, authority, effective_date, compliance_deadline)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING id
+        `, [
+          regulation.title,
+          regulation.description,
+          regulation.category,
+          regulation.jurisdiction,
+          regulation.authority,
+          regulation.effectiveDate,
+          regulation.complianceDeadline
+        ]);
+        
+        const regulationId = regulationResult.rows[0].id;
+        
+        // Insert penalties
+        for (const penalty of regulation.penalties) {
+          await query(`
+            INSERT INTO penalties (regulation_id, type, amount, description)
+            VALUES ($1, $2, $3, $4)
+          `, [regulationId, penalty.type, penalty.amount, penalty.description]);
+        }
+        
+        // Insert requirements
+        for (const requirement of regulation.requirements) {
+          await query(`
+            INSERT INTO requirements (regulation_id, description, frequency, documentation, deadline)
+            VALUES ($1, $2, $3, $4, $5)
+          `, [regulationId, requirement.description, requirement.frequency, requirement.documentation, requirement.deadline]);
+        }
+        
+        // Insert exemptions
+        for (const exemption of regulation.exemptions) {
+          await query(`
+            INSERT INTO regulation_exemptions (regulation_id, exemption_text)
+            VALUES ($1, $2)
+          `, [regulationId, exemption]);
+        }
+        
+        // Insert applicability
+        for (const appliesTo of regulation.appliesTo) {
+          await query(`
+            INSERT INTO regulation_applicability (regulation_id, applies_to)
+            VALUES ($1, $2)
+          `, [regulationId, appliesTo]);
+        }
+        
+        console.log(`✅ Added regulation ${i + 1}/${regulations.length}: ${regulation.title}`);
+        successCount++;
+        
+      } catch (regulationError) {
+        console.error(`❌ Error adding regulation "${regulation.title}":`, regulationError.message);
+        errorCount++;
+        // Continue with next regulation instead of stopping
       }
-      
-      // Insert requirements
-      for (const requirement of regulation.requirements) {
-        await query(`
-          INSERT INTO requirements (regulation_id, description, frequency, documentation, deadline)
-          VALUES ($1, $2, $3, $4, $5)
-        `, [regulationId, requirement.description, requirement.frequency, requirement.documentation, requirement.deadline]);
-      }
-      
-      // Insert exemptions
-      for (const exemption of regulation.exemptions) {
-        await query(`
-          INSERT INTO regulation_exemptions (regulation_id, exemption_text)
-          VALUES ($1, $2)
-        `, [regulationId, exemption]);
-      }
-      
-      // Insert applicability
-      for (const appliesTo of regulation.appliesTo) {
-        await query(`
-          INSERT INTO regulation_applicability (regulation_id, applies_to)
-          VALUES ($1, $2)
-        `, [regulationId, appliesTo]);
-      }
-      
-      console.log(`✅ Added regulation: ${regulation.title}`);
     }
     
-    console.log(`🎉 Successfully seeded ${regulations.length} regulations with full details!`);
+    console.log(`🎉 Seeding completed! Success: ${successCount}, Errors: ${errorCount}, Total: ${regulations.length}`);
+    
+    if (errorCount > 0) {
+      console.log('⚠️ Some regulations failed to insert. Check the logs above for details.');
+    }
     
   } catch (error) {
-    console.error('❌ Error seeding regulations:', error);
+    console.error('❌ Critical error during seeding:', error);
     throw error;
   }
 }

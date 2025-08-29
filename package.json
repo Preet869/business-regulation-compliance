@@ -21,6 +21,8 @@
     "db:seed:regulations:batch2": "node server/database/regulations-seeder-batch2.js",
     "db:migrate:business-factors": "node server/database/migrate-business-factors.js",
     "db:cleanup": "node server/database/cleanup-test-data.js",
+    "db:force-reseed": "node server/database/force-reseed.js",
+    "db:check": "node server/database/check-data.js",
     "test:business-mapping": "node test-business-mapping.js",
     "render:setup": "npm run db:setup && npm run db:seed:regulations",
     "render:deploy": "node render-setup.js",
