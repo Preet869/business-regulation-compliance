@@ -476,64 +476,74 @@ async function determineApplicableRegulations(businessData) {
 function calculateComplianceScore(regulations, businessData) {
   if (regulations.length === 0) return 100;
   
+  console.log('Calculating compliance score for:', {
+    businessName: businessData.name,
+    industry: businessData.industry,
+    size: businessData.size,
+    employeeCount: businessData.employeeCount,
+    annualRevenue: businessData.annualRevenue,
+    regulationCount: regulations.length
+  });
+  
   // Base score starts at 100
   let score = 100;
   
   // Deduct points for each regulation category (more realistic penalties)
   const categoryPenalties = {
-    'Labor & Employment': 8,
-    'Workplace Safety': 10,
-    'Environmental': 7,
-    'Health & Safety': 9,
-    'Privacy & Security': 6,
-    'Business Licensing': 4,
-    'Local Ordinances': 3,
-    'Land Use': 5,
-    'Transportation': 4,
-    'Taxation': 6,
-    'Professional Licensing': 5,
-    'Civil Rights': 7,
-    'Financial Services': 6
+    'Labor & Employment': 3,
+    'Workplace Safety': 4,
+    'Environmental': 2,
+    'Health & Safety': 3,
+    'Privacy & Security': 2,
+    'Business Licensing': 1,
+    'Local Ordinances': 1,
+    'Land Use': 2,
+    'Transportation': 2,
+    'Taxation': 2,
+    'Professional Licensing': 2,
+    'Civil Rights': 3,
+    'Financial Services': 2
   };
   
-  // Calculate total penalty based on unique categories (IMPROVED)
+  // Calculate total penalty based on unique categories (REDUCED)
   const uniqueCategories = [...new Set(regulations.map(r => r.category))];
   let totalPenalty = 0;
   
   uniqueCategories.forEach(category => {
-    const penalty = categoryPenalties[category] || 5;
+    const penalty = categoryPenalties[category] || 2;
     totalPenalty += penalty;
   });
   
-  // Apply business size multiplier (MAJOR FIX)
+  console.log('Category penalties:', { uniqueCategories, totalPenalty });
+  
+  // Apply business size multiplier (REDUCED)
   let sizeMultiplier = 1.0;
   if (businessData.size === 'Small') {
-    sizeMultiplier = 0.2; // Small businesses get 80% penalty reduction
+    sizeMultiplier = 0.3; // Small businesses get 70% penalty reduction
   } else if (businessData.size === 'Medium') {
-    sizeMultiplier = 0.5; // Medium businesses get 50% penalty reduction
+    sizeMultiplier = 0.6; // Medium businesses get 40% penalty reduction
   }
   // Large businesses get full penalty (1.0 multiplier)
   
-  // Apply employee count adjustment (ENHANCED)
+  // Apply employee count adjustment (REDUCED)
   let employeeMultiplier = 1.0;
   if (businessData.employeeCount <= 5) {
     employeeMultiplier = 0.2; // Very small businesses get 80% penalty reduction
   } else if (businessData.employeeCount <= 10) {
-    employeeMultiplier = 0.3; // Small businesses get 30% penalty reduction
+    employeeMultiplier = 0.4; // Small businesses get 60% penalty reduction
   } else if (businessData.employeeCount <= 25) {
-    employeeMultiplier = 0.5; // Small businesses get 50% penalty reduction
+    employeeMultiplier = 0.6; // Small businesses get 40% penalty reduction
   } else if (businessData.employeeCount <= 50) {
-    employeeMultiplier = 0.7; // Medium businesses get 30% penalty reduction
+    employeeMultiplier = 0.8; // Medium businesses get 20% penalty reduction
   } else if (businessData.employeeCount <= 200) {
-    employeeMultiplier = 0.85; // Medium businesses get 15% penalty reduction
+    employeeMultiplier = 1.0; // Medium businesses get no penalty reduction
   } else if (businessData.employeeCount <= 1000) {
-    employeeMultiplier = 1.5; // Large businesses get 50% penalty increase
+    employeeMultiplier = 1.2; // Large businesses get 20% penalty increase
   } else if (businessData.employeeCount > 1000) {
-    employeeMultiplier = 2.0; // Very large businesses get 100% penalty increase
-  } else if (businessData.employeeCount > 5000) {
-    employeeMultiplier = 2.5; // Enterprise businesses get 150% penalty increase
+    employeeMultiplier = 1.5; // Very large businesses get 50% penalty increase
   }
-  // Default: Large businesses get full penalty (1.0 multiplier)
+  
+  console.log('Multipliers:', { sizeMultiplier, employeeMultiplier });
   
   // Calculate final penalty
   const finalPenalty = totalPenalty * sizeMultiplier * employeeMultiplier;
@@ -541,49 +551,64 @@ function calculateComplianceScore(regulations, businessData) {
   // Deduct penalty from base score
   score = Math.max(0, score - finalPenalty);
   
-
+  console.log('Score after category penalties:', score);
   
-  // Revenue-based penalties (ENHANCED for large businesses)
+  // Revenue-based penalties (REDUCED)
   if (businessData.annualRevenue > 1000000 && businessData.size !== 'Small') { // $1M+
-    score = Math.max(0, score - 5);
+    score = Math.max(0, score - 2);
   }
   if (businessData.annualRevenue > 10000000 && businessData.size !== 'Small') { // $10M+
-    score = Math.max(0, score - 8);
+    score = Math.max(0, score - 3);
   }
   if (businessData.annualRevenue > 50000000 && businessData.size === 'Large') { // $50M+
-    score = Math.max(0, score - 12); // Additional penalty for very large revenue
+    score = Math.max(0, score - 5); // Reduced penalty for very large revenue
   }
   
-  // Enterprise-level complexity penalties
+  console.log('Score after revenue penalties:', score);
+  
+  // Employee count penalties (REDUCED)
+  if (businessData.employeeCount > 1000) {
+    score = Math.max(0, score - 5); // Reduced penalty for large businesses
+  }
   if (businessData.employeeCount > 5000) {
-    score = Math.max(0, score - 15); // Enterprise businesses have complex compliance needs
+    score = Math.max(0, score - 8); // Reduced penalty for enterprise businesses
   }
   if (businessData.employeeCount > 10000) {
-    score = Math.max(0, score - 20); // Mega-enterprises have extensive compliance requirements
+    score = Math.max(0, score - 10); // Reduced penalty for mega-enterprises
   }
   
-  // Industry-specific penalties (REDUCED for small businesses)
+  console.log('Score after employee penalties:', score);
+  
+  // Industry-specific penalties (REDUCED)
   if (businessData.industry === 'Healthcare') {
-    const healthcarePenalty = businessData.size === 'Small' ? 8 : 15;
+    const healthcarePenalty = businessData.size === 'Small' ? 3 : 6;
     score = Math.max(0, score - healthcarePenalty);
   }
   if (businessData.industry === 'Technology') {
-    const techPenalty = businessData.size === 'Small' ? 5 : 10;
+    const techPenalty = businessData.size === 'Small' ? 2 : 4;
     score = Math.max(0, score - techPenalty);
   }
   if (businessData.industry === 'Construction') {
-    const constructionPenalty = businessData.size === 'Small' ? 6 : 12;
+    const constructionPenalty = businessData.size === 'Small' ? 3 : 5;
     score = Math.max(0, score - constructionPenalty);
   }
   
-  // Ensure minimum score for very small businesses (ENHANCED)
+  console.log('Score after industry penalties:', score);
+  
+  // Ensure minimum scores based on business characteristics
   if (businessData.size === 'Small' && businessData.employeeCount <= 10) {
-    score = Math.max(score, 75); // Minimum 75% for very small businesses
+    score = Math.max(score, 80); // Minimum 80% for very small businesses
   } else if (businessData.size === 'Small') {
-    score = Math.max(score, 65); // Minimum 65% for small businesses
+    score = Math.max(score, 70); // Minimum 70% for small businesses
   } else if (businessData.size === 'Medium' && businessData.employeeCount <= 50) {
-    score = Math.max(score, 50); // Minimum 50% for medium businesses
+    score = Math.max(score, 60); // Minimum 60% for medium businesses
+  } else if (businessData.size === 'Large' && businessData.employeeCount <= 1000) {
+    score = Math.max(score, 40); // Minimum 40% for large businesses
+  } else if (businessData.size === 'Large' && businessData.employeeCount > 1000) {
+    score = Math.max(score, 25); // Minimum 25% for very large businesses
   }
+  
+  console.log('Final score after minimums:', score);
   
   return Math.max(0, Math.round(score));
 }
